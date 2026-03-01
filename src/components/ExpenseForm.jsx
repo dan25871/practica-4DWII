@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { categories } from '../data/categories'
 import DatePicker from 'react-date-picker'
 import 'react-date-picker/dist/DatePicker.css'
@@ -15,17 +15,20 @@ export const ExpenseForm = () => {
   })
 
   const [error, setError] = useState('')
+
   const dispatch = useContext(BudgetDispatchContext)
   const state = useContext(BudgetStateContext)
-  
+
+  // ✅ Cargar datos cuando se edita
   useEffect(() => {
-  if (state.editingId) {
-    const editingExpense = state.expenses.filter(
-      currentExpense => currentExpense.id === state.editingId
-    )[0]
-    setExpense(editingExpense)
-  }
-}, [state.editingId])
+    if (state.editingId) {
+      const editingExpense = state.expenses.filter(
+        (currentExpense) => currentExpense.id === state.editingId
+      )[0]
+
+      if (editingExpense) setExpense(editingExpense)
+    }
+  }, [state.editingId])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -45,55 +48,76 @@ export const ExpenseForm = () => {
   }
 
   const handleSubmit = (e) => {
-  e.preventDefault();
+    e.preventDefault()
 
-  //Validación
-  if (Object.values(expense).includes('')) {
-    setError('Todos los Campos son Obligatorios')
-    return
-  }
+    // Validación
+    if (Object.values(expense).includes('')) {
+      setError('Todos los Campos son Obligatorios')
+      return
+    }
 
-  if (state.editingId) {
-    dispatch({
-      type: 'update-expense',
-      payload: { expense: { id: state.editingId, ...expense } }
+    // ✅ Validación NO exceder presupuesto (add o edit)
+    const newAmount = Number(expense.amount) || 0
+
+    const totalExpenses = state.expenses.reduce(
+      (total, exp) => total + (Number(exp.amount) || 0),
+      0
+    )
+
+    const previousAmount = state.editingId
+      ? (state.expenses.find((exp) => exp.id === state.editingId)?.amount || 0)
+      : 0
+
+    const projectedTotal = totalExpenses - Number(previousAmount || 0) + newAmount
+
+    if (projectedTotal > state.budget) {
+      setError('El gasto excede el presupuesto disponible')
+      return
+    }
+
+    if (state.editingId) {
+      dispatch({
+        type: 'update-expense',
+        payload: { expense: { id: state.editingId, ...expense } }
+      })
+    } else {
+      dispatch({ type: 'add-expense', payload: { expense } })
+    }
+
+    setError('')
+
+    setExpense({
+      expenseName: "",
+      amount: 0,
+      category: "",
+      date: new Date(),
     })
-  } else {
-    dispatch({ type: 'add-expense', payload: { expense } })
   }
 
-  // Reiniciar el state/form
-  setExpense({
-    expenseName: "",
-    amount: 0,
-    category: "",
-    date: new Date(),
-  })
-}
+  const isEditing = !!state.editingId
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
       <legend className="uppercase text-center text-2xl font-black border-b-4 border-blue-500 py-2">
-  {state.editingId ? "Guardar cambios" : "Nuevo gasto"}
-</legend>
+        {isEditing ? "Guardar cambios" : "Nuevo gasto"}
+      </legend>
 
       {error && <ErrorMessage>{error}</ErrorMessage>}
 
       <div className="flex flex-col gap-2">
-  <label htmlFor="expenseName" className="text-xl">
-    Nombre Gasto:
-  </label>
-
-  <input
-    type="text"
-    id="expenseName"
-    placeholder="Añade el Nombre del gasto"
-    className="bg-slate-100 p-2"
-    name="expenseName"
-    value={expense.expenseName}
-    onChange={handleChange}
-  />
-</div>
+        <label htmlFor="expenseName" className="text-xl">
+          Nombre Gasto:
+        </label>
+        <input
+          type="text"
+          id="expenseName"
+          placeholder="Añade el Nombre del gasto"
+          className="bg-slate-100 p-2"
+          name="expenseName"
+          value={expense.expenseName}
+          onChange={handleChange}
+        />
+      </div>
 
       <div className="flex flex-col gap-2">
         <label htmlFor="amount" className="text-xl">
@@ -121,7 +145,7 @@ export const ExpenseForm = () => {
           value={expense.category}
           onChange={handleChange}
         >
-          <option> -- Seleccione --</option>
+          <option value=""> -- Seleccione --</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -131,7 +155,7 @@ export const ExpenseForm = () => {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="amount" className="text-xl">
+        <label className="text-xl">
           Fecha Gasto:
         </label>
         <DatePicker
@@ -141,11 +165,11 @@ export const ExpenseForm = () => {
         />
       </div>
 
-    <input
-  type="submit"
-  className="bg-blue-600 cursor-pointer w-full p-2 text-white uppercase font-bold rounded-lg"
-  value={state.editingId ? "Guardar cambios" : "Registrar gasto"}
-/>
+      <input
+        type="submit"
+        className="bg-blue-600 cursor-pointer w-full p-2 text-white uppercase font-bold rounded-lg"
+        value={isEditing ? "Guardar cambios" : "Registrar gasto"}
+      />
     </form>
   )
 }
